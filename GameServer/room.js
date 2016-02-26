@@ -1,5 +1,5 @@
 var util = require('util'),
-	Config = require('./config'),
+	Config = require('./../config'),
 	Message = require('./message'),
 	Player = require('./player');
 
@@ -10,7 +10,7 @@ var Room = function(name, options) {
 	this.options = options;
 	this.suddenDeathTimer = null;
 	this.state = Room.STATE_STOPPED;
-	
+
 	this.winners = [];
 	this.startTime = null;
 	this.actions = [];
@@ -38,7 +38,7 @@ Room.prototype.addPlayer = function(player) {
 			break;
 		}
 	}
-	
+
 	if(index == -1) {
 		// add new player
 		index = this.players.length;
@@ -47,16 +47,16 @@ Room.prototype.addPlayer = function(player) {
 		// reuse empty slot
 		this.players[index] = player;
 	}
-	
+
 	player.setRoom(this, index);
-	
+
 	this.broadcast(Message.SET_PLAYER, {p: player.getClientInfo(), join: true}, player);
 	for(var i=0; i<this.players.length; ++i) {
 		if(!this.players[i])
 			continue;
 		player.send(Message.SET_PLAYER, {p: this.players[i].getClientInfo(), self: (this.players[i] == player)});
 	}
-	
+
 	this.emit(Room.EVENT_JOIN);
 }
 
@@ -86,13 +86,13 @@ Room.prototype.numPlayers = function() {
 
 Room.prototype.playerDied = function(player, s) {
 	this.broadcast(Message.GAMEOVER, {id: player.index});
-	
+
 	var numIsPlaying = 0;
 	for(var i=0; i<this.players.length; ++i) {
 		if(this.players[i] && this.players[i].isPlaying)
 			++numIsPlaying;
 	}
-	
+
 	this.playerStats[player.index] = {
 		identity: player.identity,
 		team: player.team,
@@ -108,9 +108,9 @@ Room.prototype.playerWon = function(player, s) {
 		console.log('invalid winner!?');
 		return;
 	}
-	
+
 	this.playerStats[player.index].s = s; // set stats
-	
+
 	// wait for stats from all winners
 	for(var i in this.winners) {
 		var p = this.winners[i];
@@ -127,10 +127,10 @@ Room.prototype.checkGameState = function() {
 	var room = this;
 	var activePlayers = [];
 	var activeTeams = [];
-	
+
 	if(this.state != Room.STATE_STARTED)
 		return;
-	
+
 	for(var i=0; i<this.players.length; ++i) {
 		if(!this.players[i])
 			continue;
@@ -141,7 +141,7 @@ Room.prototype.checkGameState = function() {
 				activeTeams.push(p.team);
 		}
 	}
-	
+
 	if(activePlayers.length == 1 || (activeTeams.length == 1 && activeTeams[0] != '')) {
 		var ids = [];
 		this.winners = activePlayers;
@@ -157,7 +157,7 @@ Room.prototype.checkGameState = function() {
 			};
 		}
 		this.broadcast(Message.WINNER, {id: ids});
-		
+
 		if(this.suddenDeathTimer) {
 			clearInterval(this.suddenDeathTimer);
 			this.suddenDeathTimer = null;
@@ -187,7 +187,7 @@ Room.prototype.startGame = function() {
 	if(this.state == Room.STATE_STOPPED) {
 		this.state = Room.STATE_STARTING;
 		this.broadcast(Message.CHAT, {text: 'Game is about to start!', id: null});
-		
+
 		var self = this;
 		var count = 0;
 		var countdownTimer = setInterval(function() {
@@ -207,7 +207,7 @@ Room.prototype.doStartGame = function() {
 		clearInterval(this.suddenDeathTimer);
 		this.suddenDeathTimer = null;
 	}
-	
+
 	var seed = Math.floor(Math.random() * 1000000000);
 	for(var i=0; i<this.players.length; ++i) {
 		if(!this.players[i])
@@ -218,13 +218,13 @@ Room.prototype.doStartGame = function() {
 		this.players[i].send(Message.START, {seed: seed});
 	}
 	this.broadcast(Message.CHAT, {text: 'Go!!!', id: null});
-	
+
 	this.state = Room.STATE_STARTED;
 	this.winner = null;
 	this.startTime = Date.now();
 	this.actions = [];
 	this.playerStats = {};
-	
+
 	this.emit(Room.EVENT_START);
 	if(this.numPlayers() > 2)
 		this.checkGameState();

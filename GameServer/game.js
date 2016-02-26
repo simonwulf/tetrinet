@@ -1,7 +1,7 @@
 var Message = require('./message');
 var Player = require('./player');
 var Room = require('./room');
-var Config = require('./config');
+var Config = require('./../config');
 var util = require('util');
 
 if (Config.MYSQL_ENABLED) {

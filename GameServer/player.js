@@ -1,7 +1,7 @@
 var util = require('util'),
 	Message = require('./message'),
 	Room = require('./room'),
-	Config = require('./config');
+	Config = require('./../config');
 
 // class Player extends EventEmitter
 var Player = function(game, client) {
