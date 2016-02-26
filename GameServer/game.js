@@ -1,8 +1,8 @@
-var Message = require('./message'),
-	Player = require('./player'),
-	Room = require('./room'),
-	Config = require('./config'),
-	util = require('util');
+var Message = require('./message');
+var Player = require('./player');
+var Room = require('./room');
+var Config = require('./config');
+var util = require('util');
 
 if (Config.MYSQL_ENABLED) {
 	var mysql = require('mysql');
@@ -19,72 +19,66 @@ if (Config.OPENID_ENABLED) {
 }
 
 // class Game extends EventEmitter
-var Game = function() {
+var Game = function(http) {
 	this.rooms = {};
-	
-	var io = require('socket.io').listen(Config.PORT, {timeout: 5000});
-	io.configure(function(){
-		io.set('transports', [
-			'websocket'
-			,'flashsocket'
-			//,'htmlfile'
-			//,'xhr-polling'
-			//,'jsonp-polling'
-		]);
-		io.set('origins', Config.HOST + ':*')
-		io.set('log level', 1);
-		io.set('authorization', function (handshakeData, callback) {
-			if (Config.OPENID_ENABLED) {
-				// use openid to verify identity
-				relyingParty.verifyAssertion(handshakeData.headers.referer, function(err, result) {
-					if(err)
-						return callback(err);
-					if(result.authenticated)
-						handshakeData.identity = result.claimedIdentifier;
-					callback(null, result.authenticated);
-				});
-			} else {
-				callback(null, true);
-			}
-		});
-   	});
-   	this.io = io;
-    
-    if (Config.MYSQL_ENABLED) {
-	    this.mysql = mysql.createClient(Config.MYSQL_LOGIN_DATA);
-	}
-		
+
+	//var io = require('socket.io').listen(Config.PORT, {timeout: 5000});
+	this.io = require('socket.io')(http, {
+		transports: ['websocket', 'polling'],
+		pingTimeout: 5000
+	});
+
+	//this.io.origins(Config.HOST + ':*');
+	this.io.use(function (socket, next) { //Authentication
+		var handshakeData = socket.request;
+		if (Config.OPENID_ENABLED) {
+			// use openid to verify identity
+			relyingParty.verifyAssertion(handshakeData.headers.referer, function(err, result) {
+				if(result.authenticated) {
+					handshakeData.identity = result.claimedIdentifier;
+					next();
+				} else {
+					next(err ? err : new Error('Not authorized'));
+				}
+			});
+		} else {
+			next();
+		}
+	});
+
+	// if (Config.MYSQL_ENABLED) {
+	//   this.mysql = mysql.createClient(Config.MYSQL_LOGIN_DATA);
+
 	// Setup rooms
 	this.addRoom(new Room("Cookies", {persistent: true, width:12, height:24, specials: true, generator: 1, entrydelay: 150, rotationsystem: 1, tspin: true, holdpiece: true, nextpiece: 3}));
 	this.addRoom(new Room("Pure", {persistent: true, width:12, height:24, specials: false, generator: 1, entrydelay: 0, rotationsystem: 1, tspin: true, holdpiece: true, nextpiece: 3}));
 	this.addRoom(new Room("Short", {persistent: true, width:12, height:12, specials: true, generator: 1, entrydelay: 150, rotationsystem: 1, tspin: false, holdpiece: false, nextpiece: 1}));
 	this.addRoom(new Room("Long", {persistent: true, width:12, height:35, specials: true, generator: 1, entrydelay: 150, rotationsystem: 1, tspin: false, holdpiece: false, nextpiece: 1}));
-    
-    var self = this;
-    this.io.sockets.on('connection', function(client) {
-        client.player = new Player(self, client);
+
+  this.io.sockets.on('connection', (client) => {
+    client.player = new Player(this, client);
 		client.on('disconnect', function() {
 			console.log('client disconnected: ' + client.id);
 			if(client.player.room)
 				client.player.room.removePlayer(client.player);
 		});
-    });
+  });
 }
 util.inherits(Game, process.EventEmitter);
 
 Game.prototype.addRoom = function(room) {
 	if(this.rooms[room.name])
 		return null;
-		
+
 	// Add room
 	var self = this;
 	this.rooms[room.name] = room;
 	this.broadcast(Message.ROOMS, {r: this.getRoomInfo()});
-	
+
 	room.on(Room.EVENT_JOIN, function() {
 		self.broadcast(Message.ROOMS, {r: self.getRoomInfo()});
 	});
-	
+
 	room.on(Room.EVENT_PART, function() {
 		if(!room.numPlayers() && !room.options.persistent) {
 			room.removeAllListeners();
@@ -92,14 +86,14 @@ Game.prototype.addRoom = function(room) {
 		}
 		self.broadcast(Message.ROOMS, {r: self.getRoomInfo()});
 	});
-	
+
 	// Add statistics when game is over
 	room.on(Room.EVENT_GAMEOVER, function(results, actions) {
 		if(room.name == 'TEST') {
 			console.log('Skipping logging of test room.');
 			return;
 		}
-		
+
 	    if (Config.MYSQL_ENABLED) {
 			self.mysql.query('INSERT INTO game (date, room) VALUES(NOW(), ?)', [room.name], function(err, info) {
 				if(err) {
@@ -120,7 +114,7 @@ Game.prototype.addRoom = function(room) {
 			});
 		}
 	});
-	
+
 	return room;
 }
 

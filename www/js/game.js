@@ -1,5 +1,5 @@
 function Game(name, port) {
-	
+
 	this.player = null;
 	this.players = {};
 	this.notify = false;
@@ -13,11 +13,11 @@ function Game(name, port) {
 	this.lastDropTspin = false;
 	this.backToBack = false;
 	this.view = new GameView(this);
-	
+
 	var self = this;
-	
+
 	if (name) {
-		this.socket = io.connect('//'+location.hostname+':'+port, {reconnect: false});
+		this.socket = io();
 		this.socket.on('error', function(event) {
 			console.log(event);
 		});
@@ -31,15 +31,12 @@ function Game(name, port) {
 			self.player = null;
 			//$('body').html('Disconnected');
 		});
-	
 	} else {
-	
 		// this is a single player game
-		
 		this.handleMessage({ t:Message.SET_ROOM, r: {name: 'singleplayer', options:{height:24, width:12, specials: false, generator: 1, entrydelay: 0, rotationsystem: 1, tspin: true, holdpiece: true, nextpiece: 3}}});
 		this.handleMessage({ t:Message.SET_PLAYER, self:true, p:{index:0, name:"You"} });
 	}
-	
+
 	this.view.init();
 }
 
@@ -265,7 +262,7 @@ Game.prototype.handleMessage = function(msg) {
 				p.setOptions(this.options);
 				p.view = new PlayerView(p);
 				p.view.el.prependTo('#gamearea').addClass('self');
-				
+
 				p.on(Board.EVENT_CHANGE, function() {
 					self.sendBoard();
 				});
@@ -349,7 +346,7 @@ Game.prototype.handleMessage = function(msg) {
 				this.targetList.push(p.id);
 				*/
 			break;
-			
+
 		case Message.GAMEOVER:
 			var p = this.players[msg.id];
 			p.isPlaying = false;
@@ -363,7 +360,7 @@ Game.prototype.handleMessage = function(msg) {
 				$('#chatbox').removeClass('collapsed');
 			}
 			break;
-			
+
 		case Message.WINNER:
 			for(var i in msg.id) {
 				var p = this.players[msg.id[i]];
@@ -380,7 +377,7 @@ Game.prototype.handleMessage = function(msg) {
 				this.gameLog(htmlspecialchars(p.name) + ' has won the game.', [ Game.LOG_STATUS ]);
 			}
 			break;
-			
+
 		case Message.LINES:
 			var name = msg.id != null ? this.players[msg.id].name : 'Server';
 			this.gameLog('<em>' + htmlspecialchars(name) + '</em> added <strong>' + msg.n + '</strong> lines to all', [ Game.LOG_LINES ]);
@@ -390,7 +387,7 @@ Game.prototype.handleMessage = function(msg) {
 				this.sendBoard();
 			}
 			break;
-		
+
 		case Message.REMOVE_PLAYER:
 			var p = this.players[msg.id];
 			if(p) {
@@ -398,7 +395,7 @@ Game.prototype.handleMessage = function(msg) {
 				this.removePlayer(msg.id);
 			}
 			break;
-			
+
 		case Message.START:
 			this.keyCount = 0;
 			this.linesRemoved = 0;
@@ -414,13 +411,13 @@ Game.prototype.handleMessage = function(msg) {
 			/* TODO
 			this.setTarget(this.player.id);*/
 			break;
-			
+
 		case Message.UPDATE_BOARD:
 			var p = this.players[msg.id];
 			p.data = msg.d;
 			p.emit(Board.EVENT_UPDATE);
 			break;
-			
+
 		case Message.UPDATE_PIECE:
 			var p = this.players[msg.id];
 			p.currentBlock = new Block(msg.pt, msg.r);
@@ -428,7 +425,7 @@ Game.prototype.handleMessage = function(msg) {
 			p.currentBlock.y = msg.y;
 			p.emit(Board.EVENT_UPDATE);
 			break;
-			
+
 		case Message.CHAT:
 			var name;
 			if (msg.id == null) {
@@ -442,7 +439,7 @@ Game.prototype.handleMessage = function(msg) {
 				this.createNotification(name, msg.text);
 			}
 			break;
-			
+
 		case Message.SPECIAL:
 			var sourcePlayer = this.players[msg.sid];
 			var targetPlayer = this.players[msg.id];
@@ -456,7 +453,7 @@ Game.prototype.handleMessage = function(msg) {
 				if(targetPlayer.id == this.player.id) {
 					if(this.player.reflect) {
 						if (msg.reflect) {
-							
+
 						} else {
 							msg.id = msg.sid;
 							msg.reflect = true;
@@ -474,7 +471,7 @@ Game.prototype.handleMessage = function(msg) {
 				}
 			}
 			break;
-			
+
 		case Message.ROOMS:
 			var $rooms = $('#lobby ul').empty();
 			for(var i=0; i < msg.r.length; ++i)
@@ -486,7 +483,7 @@ Game.prototype.handleMessage = function(msg) {
 						.end()
 				);
 			break;
-			
+
 		case Message.SET_ROOM:
 			// clear players
 			for(var pp in this.players) {
@@ -511,13 +508,13 @@ Game.prototype.handleMessage = function(msg) {
 				$('#chat').empty();
 			}
 			break;
-			
+
 		case Message.NAME:
 			this.gameLog('<em>' + this.players[msg.id].name + '</em> is now known as <em>' + msg.name + '</em>', [ Game.LOG_STATUS ]);
 			this.players[msg.id].name = msg.name;
 			this.updatePlayers();
 			break;
-			
+
 		default:
 			alert('Unknown message type: ' + msg.t);
 			break;
